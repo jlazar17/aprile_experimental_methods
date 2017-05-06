@@ -1,57 +1,50 @@
-#! /usr/bin/python
-
-################################################################################
-# This module was written based on a tutorial by Dan Foreman-Mackey and 
-# contributors found at http://dan.iel.fm/emcee/current/user/line/ 
-################################################################################
+#! usr/bin/python
 
 import numpy as np
-import emcee
-import scipy.optimize as op
+try:
+	import emcee
+except ImportError:
+	print('You need to install emcee to use this module. You can install this '
+		  'by running the command "sudo easy_install emcee" from the command '
+	      'line')
 
-NDIM = 4
+# This fits a gaussian with three parameters: amplitude, mean, and standard dev
+NDIM = 3
 
 ################################################################################
-###################### FIT GAUSSIAN USING SCIPY.OPTIMIZE #######################
+###################### DEFINE LN-LIKELIEHOOD FUNCTION ##########################
 
-def gauss(x, p):
-	A, mu, sigma = p
-	return A*np.exp(-(x-mu)**2/(2.*sigma**2))
+def gauss(p, x):
+	amp, mu, sigma = p
+	return amp*np.exp(-(x-mu)**2/(2.*sigma**2))
 
-def lnlike(theta, x, y, yerr):
-	A, mu, sigma, lnf = theta
-	model = gauss(x,(A,mu,sigma))
-	inv_sigma2 = 1.0/(yerr**2 + model**2*np.exp(2*lnf))
-	return -0.5*(np.sum((y-model)**2*inv_sigma2 - np.log(inv_sigma2)))
+def lnlike(p, x, y, yerr):
+	amp, mu, sigma = p
+	model = gauss(p, x)
+	return -0.5*(np.sum((y-model)**2/(yerr**2) + np.log(yerr)))
 
-def findParameters(x,y,yerr,A0,mu0,sigma0,lnf0):
-	nll = lambda *args: -lnlike(*args)
-	result = op.minimize(nll, [A0, mu0, sigma0, lnf0], args=(x, y, yerr))
-#	A_ml, mu_ml, sigma_ml, lnf_ml = result["x"]
-	return result["x"]
+################################################################################
+########################## MONTE-CARLO SIMULATION ##############################
 
-def lnprior(theta, thetaLower, thetaUpper):
-	A, mu, sig, lnf = theta
-	AL, muL, sigL, lnfL = thetaLower
-	AU, muU, sigU, lnfU = thetaUpper
-	if AL < A < AU and muL < mu < muU and lnfL < lnf < lnfU and sigL < sig<sigU:
-		return 0.0
-	return -np.inf
+def mcsimulation(pguess, x, y, yerr, n=250):
+	# random parameters for the start of each MC simulation
+	p0 = [ pguess + 1e-4*np.random.randn(NDIM) for i in range(n) ]
+	sampler = emcee.EnsembleSampler(n, NDIM, lnlike, args=[x,y,yerr],a=4)
+	# runs a MC simulation for 200 steps as a burn in
+	pos, prob, state = sampler.run_mcmc(p0, 200)
+	sampler.reset()
+	# Resarts the MC smulations from the end of the 200 step burn in
+	pos, prob, state = sampler.run_mcmc(pos, 1000, rstate0=state)
+	return pos, prob, sampler
 
-def lnprob(theta, thetaL, thetaU, x, y, yerr):
-	lp = lnprior(theta, thetaL, thetaU)
-	if not np.isfinite(lp):
-		return -np.inf
-	return lp + lnlike(theta, x, y, yerr)
+################################################################################
+################ MANIPULATE MC OUTPUT FOR RELEVANT QUANTITIES ##################
 
-def uncertainties(nwalkers,theta0, thetaL, thetaU, x, y, yerr):
-	result = findParameters(x,y,yerr,*theta0)
-	print(result)
-	pos = [result + 1e-4*np.random.randn(NDIM) for i in range(nwalkers)]
-	sampler = emcee.EnsembleSampler(nwalkers, NDIM, lnprob,
-                                    args=(thetaL, thetaU, x, y, yerr))
-	sampler.run_mcmc(pos, 500)
-	samples = sampler.chain[:, 50:, :].reshape((-1, NDIM))
-	samples[:, 2] = np.exp(samples[:, 2])
-	return map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]), 
-			   zip(*np.percentile(samples, [16, 50, 84],axis=0)))
+def getStats(pguess, x, y, yerr, nwalkers=250):
+	pos, prob, sampler = mcsimulation(pguess, x, y, yerr, n=nwalkers)
+	maxprob_indice = np.argmax(prob)
+	amp_fit, mu_fit, sigma_fit = pos[maxprob_indice]
+	amp_std = sampler.flatchain[:,0].std()
+	mu_std = sampler.flatchain[:,1].std()
+	sigma_std = sampler.flatchain[:,2].std()
+	return amp_fit, mu_fit, sigma_fit, amp_std, mu_std, sigma_std
