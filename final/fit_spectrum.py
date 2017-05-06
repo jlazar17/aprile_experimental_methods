@@ -25,7 +25,7 @@ yErrs = np.array([ x**0.5 for x in n ])
 ################################################################################
 ############################# FITTING GAUSSIAN #################################
 
-# numbers based on looking at graph
+# numbers based on looking at graph in assignment
 guess = (140, 33000, 879)
 a, mu, sigma, a_std, mu_std, sigma_std = gfit.getStats(guess, binMids, n, yErrs)
 gauss = gfit.gauss((a, mu, sigma), binMids)
