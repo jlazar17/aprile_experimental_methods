@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 import pickle
 import numpy as np
-import emceeGaussFit as gfit
+import emceeGaussFit2 as gfit
 
 ################################################################################
 ############################## PREPARING ARRAY #################################
@@ -24,13 +24,11 @@ yErrs = np.array([ x**0.5 for x in n ])
 ################################################################################
 ############################# FITTING GAUSSIAN #################################
 
-# numbers based on those in assignment
-theta = gfit.findParameters(binMids,n,yErrs,160,32910,879,0.5)
-thetaL = (125,31000,700,-10)
-thetaU = (200,35000,1000,1)
-Amcmc, mumcmc, sigmcmc, lnfmcmc = gfit.uncertainties(100,theta,thetaL,thetaU,
-													 binMids,n,yErrs)
-print(Amcmc, mumcmc, sigmcmc, lnfmcmc)
+# numbers based on looking at graph
+guess = (140, 33000, 879)
+a, mu, sigma, a_std, mu_std, sigma_std = gfit.getStats(guess, binMids, n, yErrs)
+print(a, mu, sigma)
+print(a_std, mu_std, sigma_std)
 
 ################################################################################
 ################################# PLOTTING #####################################
