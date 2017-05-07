@@ -1,5 +1,6 @@
 #! usr/bin/python
 
+from sys import exit
 import numpy as np
 try:
 	import emcee
@@ -7,6 +8,7 @@ except ImportError:
 	print('You need to install emcee to use this module. You can install this '
 		  'by running the command "sudo easy_install emcee" from the command '
 	      'line')
+	exit()
 
 # This fits a gaussian with three parameters: amplitude, mean, and standard dev
 NDIM = 3
